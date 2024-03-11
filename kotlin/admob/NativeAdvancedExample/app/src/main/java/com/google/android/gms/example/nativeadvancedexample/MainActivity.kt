@@ -24,6 +24,7 @@ import android.view.View
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
@@ -36,6 +37,7 @@ import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.google.android.gms.example.nativeadvancedexample.databinding.ActivityMainBinding
 import com.google.android.gms.example.nativeadvancedexample.databinding.AdUnifiedBinding
+import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "MainActivity"
@@ -43,7 +45,11 @@ const val ADMOB_AD_UNIT_ID = "ca-app-pub-3940256099942544/2247696110"
 
 /** A simple activity class that displays native ad formats. */
 class MainActivity : AppCompatActivity() {
-
+  companion object {
+    init {
+      Timber.plant(Timber.DebugTree())
+    }
+  }
   private val isMobileAdsInitializeCalled = AtomicBoolean(false)
   private lateinit var mainActivityBinding: ActivityMainBinding
   private lateinit var googleMobileAdsConsentManager: GoogleMobileAdsConsentManager
@@ -226,16 +232,21 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
+  private val isStopped: Boolean
+    get() = !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+
   /**
    * Creates a request for a new native ad based on the boolean parameters and calls the
    * corresponding "populate" method when one is successfully returned.
    */
   private fun refreshAd() {
+    Timber.d("refreshAd")
     mainActivityBinding.refreshButton.isEnabled = false
 
     val builder = AdLoader.Builder(this, ADMOB_AD_UNIT_ID)
 
     builder.forNativeAd { nativeAd ->
+      Timber.d("onAdLoaded: $nativeAd")
       // OnUnifiedNativeAdLoadedListener implementation.
       // If this callback occurs after the activity is destroyed, you must call
       // destroy and return or you may get a memory leak.
@@ -243,7 +254,7 @@ class MainActivity : AppCompatActivity() {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
         activityDestroyed = isDestroyed
       }
-      if (activityDestroyed || isFinishing || isChangingConfigurations) {
+      if (activityDestroyed || isFinishing || isChangingConfigurations || isStopped) {
         nativeAd.destroy()
         return@forNativeAd
       }
@@ -302,8 +313,9 @@ class MainActivity : AppCompatActivity() {
     }
   }
 
-  override fun onDestroy() {
+  override fun onStop() {
+    Timber.d("onStop")
     currentNativeAd?.destroy()
-    super.onDestroy()
+    super.onStop()
   }
 }
