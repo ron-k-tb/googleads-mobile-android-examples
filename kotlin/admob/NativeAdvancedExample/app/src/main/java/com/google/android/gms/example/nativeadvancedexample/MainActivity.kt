@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity() {
     googleMobileAdsConsentManager.gatherConsent(this) { consentError ->
       if (consentError != null) {
         // Consent not obtained in current session.
-        Log.w(TAG, "${consentError.errorCode}. ${consentError.message}")
+        Timber.w("gatherConsent: ${consentError.errorCode}. ${consentError.message}")
       }
 
       if (googleMobileAdsConsentManager.canRequestAds) {
@@ -280,6 +280,8 @@ class MainActivity : AppCompatActivity() {
         .withAdListener(
           object : AdListener() {
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+              Timber.d("onAdFailedToLoad: error=%s", loadAdError)
+
               val error =
                 """
            domain: ${loadAdError.domain}, code: ${loadAdError.code}, message: ${loadAdError.message}
