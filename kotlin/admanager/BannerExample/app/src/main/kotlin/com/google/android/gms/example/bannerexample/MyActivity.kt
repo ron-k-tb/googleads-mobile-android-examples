@@ -22,15 +22,19 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
 import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.google.android.gms.example.bannerexample.databinding.ActivityMyBinding
+import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "MainActivity"
@@ -38,10 +42,17 @@ private const val TAG = "MainActivity"
 /** Main Activity. Inflates main activity xml and child fragments. */
 class MyActivity : AppCompatActivity() {
 
+  companion object {
+    init {
+      Timber.plant(Timber.DebugTree())
+    }
+  }
+
   private val isMobileAdsInitializeCalled = AtomicBoolean(false)
   private val initialLayoutComplete = AtomicBoolean(false)
   private lateinit var binding: ActivityMyBinding
-  private lateinit var adView: AdManagerAdView
+
+  private var adView: AdManagerAdView? = null
   private lateinit var googleMobileAdsConsentManager: GoogleMobileAdsConsentManager
 
   // Determine the screen width (less decorations) to use for the ad width.
@@ -68,22 +79,23 @@ class MyActivity : AppCompatActivity() {
     binding = ActivityMyBinding.inflate(layoutInflater)
     setContentView(binding.root)
 
-    adView = AdManagerAdView(this)
-    binding.adViewContainer.addView(adView)
 
     // Log the Mobile Ads SDK version.
     Log.d(TAG, "Google Mobile Ads SDK Version: " + MobileAds.getVersion())
 
     googleMobileAdsConsentManager = GoogleMobileAdsConsentManager.getInstance(applicationContext)
     googleMobileAdsConsentManager.gatherConsent(this) { error ->
+      Timber.d(
+        "gatherConsent: canRequestAds=%s isPrivacyOptionsRequired=%s error=%s",
+        googleMobileAdsConsentManager.canRequestAds,
+        googleMobileAdsConsentManager.isPrivacyOptionsRequired,
+        error
+      )
       if (error != null) {
         // Consent not obtained in current session.
         Log.d(TAG, "${error.errorCode}: ${error.message}")
       }
-
-      if (googleMobileAdsConsentManager.canRequestAds) {
-        initializeMobileAdsSdk()
-      }
+      initializeMobileAdsSdk()
 
       if (googleMobileAdsConsentManager.isPrivacyOptionsRequired) {
         // Regenerate the options menu to include a privacy setting.
@@ -92,17 +104,19 @@ class MyActivity : AppCompatActivity() {
     }
 
     // This sample attempts to load ads using consent obtained in the previous session.
-    if (googleMobileAdsConsentManager.canRequestAds) {
-      initializeMobileAdsSdk()
-    }
+    initializeMobileAdsSdk()
 
     // Since we're loading the banner based on the adContainerView size, we need to wait until this
     // view is laid out before we can get the width.
-    binding.adViewContainer.viewTreeObserver.addOnGlobalLayoutListener {
-      if (!initialLayoutComplete.getAndSet(true) && googleMobileAdsConsentManager.canRequestAds) {
-        loadBanner()
+    binding.adViewContainer.viewTreeObserver.addOnGlobalLayoutListener(object :
+      ViewTreeObserver.OnGlobalLayoutListener {
+      override fun onGlobalLayout() {
+        if (initialLayoutComplete.compareAndSet(false, true)) {
+          binding.adViewContainer.viewTreeObserver.removeOnGlobalLayoutListener(this)
+          considerLoadBanner()
+        }
       }
-    }
+    })
 
     // Set your test devices. Check your logcat output for the hashed device ID to
     // get test ads on a physical device. e.g.
@@ -115,19 +129,19 @@ class MyActivity : AppCompatActivity() {
 
   /** Called when leaving the activity. */
   public override fun onPause() {
-    adView.pause()
+    adView?.pause()
     super.onPause()
   }
 
   /** Called when returning to the activity. */
   public override fun onResume() {
     super.onResume()
-    adView.resume()
+    adView?.resume()
   }
 
   /** Called before the activity is destroyed. */
   public override fun onDestroy() {
-    adView.destroy()
+    destroy()
     super.onDestroy()
   }
 
@@ -162,6 +176,44 @@ class MyActivity : AppCompatActivity() {
   }
 
   private fun loadBanner() {
+    Timber.d("loadBanner: adSize=%s", adSize)
+    destroy()
+
+    val adView = AdManagerAdView(this)
+    this.adView = adView
+
+    adView.adListener = object : AdListener() {
+      override fun onAdFailedToLoad(p0: LoadAdError) {
+        Timber.d("onAdFailedToLoad: error=%s", p0)
+      }
+
+      override fun onAdLoaded() {
+        Timber.d("onAdLoaded")
+      }
+
+      override fun onAdImpression() {
+        Timber.d("onAdImpression")
+      }
+
+      override fun onAdClicked() {
+        Timber.d("onAdClicked")
+      }
+
+      override fun onAdSwipeGestureClicked() {
+        Timber.d("onAdSwipeGestureClicked")
+      }
+
+      override fun onAdOpened() {
+        Timber.d("onAdOpened")
+      }
+
+      override fun onAdClosed() {
+        Timber.d("onAdClosed")
+      }
+    }
+
+    binding.adViewContainer.addView(adView)
+
     // This is an ad unit ID for a test ad. Replace with your own banner ad unit ID.
     adView.adUnitId = "/6499/example/banner"
     adView.setAdSize(adSize)
@@ -171,19 +223,61 @@ class MyActivity : AppCompatActivity() {
 
     // Start loading the ad in the background.
     adView.loadAd(adRequest)
+
+  }
+
+  private fun destroy() {
+    Timber.d("destroy: adView=%s", adView)
+    binding.adViewContainer.removeAllViews()
+
+    adView?.destroy()
+    adView = null
   }
 
   private fun initializeMobileAdsSdk() {
-    if (isMobileAdsInitializeCalled.getAndSet(true)) {
+    val canRequestAds = googleMobileAdsConsentManager.canRequestAds
+    Timber.d(
+      "initializeMobileAdsSdk: canRequestAds=%s called=%s",
+      canRequestAds, isMobileAdsInitializeCalled
+    )
+    if (!canRequestAds) {
       return
     }
-
-    // Initialize the Mobile Ads SDK.
-    MobileAds.initialize(this) {}
+    if (isMobileAdsInitializeCalled.compareAndSet(false, true)) {
+      // Initialize the Mobile Ads SDK.
+      MobileAds.initialize(this) {}
+    }
 
     // Load an ad.
-    if (initialLayoutComplete.get()) {
+    considerLoadBanner()
+  }
+
+  override fun onStart() {
+    super.onStart()
+    considerLoadBanner()
+  }
+
+  override fun onStop() {
+    super.onStop()
+    destroy()
+  }
+
+  private fun considerLoadBanner() {
+    Timber.d(
+      "considerLoadBanner: initialLayoutComplete=%s canRequestAds=%s isMobileAdsInitializeCalled=%s adView=%s",
+      initialLayoutComplete,
+      googleMobileAdsConsentManager.canRequestAds,
+      isMobileAdsInitializeCalled,
+      adView
+    )
+    if (initialLayoutComplete.get()
+      && googleMobileAdsConsentManager.canRequestAds
+      && isMobileAdsInitializeCalled.get()
+      && adView == null
+    ) {
       loadBanner()
     }
   }
+
+
 }
