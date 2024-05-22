@@ -90,6 +90,7 @@
         <item>Ad Manager - Ad Sizes</item>
         <item>Ad Manager - App Events</item>
         <item>Ad Manager - Custom Video Controls</item>
+        <item>Collapsible Banner Ad</item>
     </string-array>
 
     <string name="admob_banner_ad_unit_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
@@ -120,5 +121,6 @@
     <string name="customcontrols_view_mute" translatable="false">Mute</string>
     <string name="customcontrols_view_play" translatable="false">Play</string>
     <string name="customcontrols_view_video_status" translatable="false">Video Status: </string>
+  <string name="nav_header_explainer">Select an item to see a demo of an API feature. Code for each demo is self-contained it its own Fragment class.</string>
 
 </resources>

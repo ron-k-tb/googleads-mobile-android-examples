@@ -2,6 +2,7 @@ package com.google.android.gms.example.apidemo
 
 import android.os.Bundle
 import android.view.MenuItem
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -21,6 +22,17 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     val toolbar = findViewById<Toolbar>(R.id.toolbar)
     setSupportActionBar(toolbar)
 
+    // Handling onBackPressed.
+    val onBackPressedCallback: OnBackPressedCallback =
+      object : OnBackPressedCallback(/* enabled= */ true) {
+        override fun handleOnBackPressed() {
+          if (mainActivityBinding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            mainActivityBinding.drawerLayout.closeDrawer(GravityCompat.START)
+          }
+        }
+      }
+    onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+
     // Initialize the Mobile Ads SDK with an empty completion listener.
     MobileAds.initialize(this) {}
 
@@ -30,24 +42,12 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         mainActivityBinding.drawerLayout,
         toolbar,
         R.string.navigation_drawer_open,
-        R.string.navigation_drawer_close
+        R.string.navigation_drawer_close,
       )
     mainActivityBinding.drawerLayout.addDrawerListener(toggle)
     toggle.syncState()
 
     mainActivityBinding.navView.setNavigationItemSelectedListener(this)
-
-    val trans = this.supportFragmentManager.beginTransaction()
-    trans.replace(R.id.container, AdMobAdListenerFragment())
-    trans.commit()
-  }
-
-  override fun onBackPressed() {
-    if (mainActivityBinding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-      mainActivityBinding.drawerLayout.closeDrawer(GravityCompat.START)
-    } else {
-      super.onBackPressed()
-    }
   }
 
   override fun onNavigationItemSelected(item: MenuItem): Boolean {
@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         R.id.nav_admob_adlistener -> AdMobAdListenerFragment()
         R.id.nav_admob_adtargeting -> AdMobAdTargetingFragment()
         R.id.nav_admob_bannersizes -> AdMobBannerSizesFragment()
+        R.id.nav_collapsible_banner -> CollapsibleBannerFragment()
         R.id.nav_admob_custommute -> AdMobCustomMuteThisAdFragment()
         R.id.nav_gam_adsizes -> AdManagerMultipleAdSizesFragment()
         R.id.nav_gam_appevents -> AdManagerAppEventsFragment()
